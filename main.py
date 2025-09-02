@@ -2,33 +2,26 @@ from pathlib import Path
 import os
 import csv
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, Response
 
 BASE_DIR = Path(__file__).resolve().parent
 CSV_FILE = BASE_DIR / "referrals.csv"
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "dev-secret")  # set SECRET_KEY in Render
+app.secret_key = os.getenv("SECRET_KEY",
+                           "dev-secret")  # set SECRET_KEY in Render
+
 
 @app.route("/")
 def index():
     return render_template("index.html")
 
+
 # Example: simple dashboard that reads the CSV (adjust to your template/columns)
-@app.route("/dashboard")
-def dashboard():
-    rows = []
-    if CSV_FILE.exists():
-        with CSV_FILE.open(newline="", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
-    return render_template("dashboard.html", rows=rows)
 
 # Only for local dev; Render uses Gunicorn via Procfile
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
-
-
 
 FIELDNAMES = [
     'candidate_name',
@@ -109,19 +102,24 @@ def dashboard():
         reader = csv.DictReader(f)
         for row in reader:
             # Filtering logic
-            if location_filter and location_filter not in row['location'].lower():
+            if location_filter and location_filter not in row[
+                    'location'].lower():
                 continue
             if role_filter and role_filter not in row['role'].lower():
                 continue
-            if candidate_filter and candidate_filter not in row['candidate_name'].lower():
+            if candidate_filter and candidate_filter not in row[
+                    'candidate_name'].lower():
                 continue
-            if referrer_filter and referrer_filter not in row['referrer_name'].lower():
+            if referrer_filter and referrer_filter not in row[
+                    'referrer_name'].lower():
                 continue
             if status_filter and row['status'].lower() != status_filter:
                 continue
-            if applied_after and row.get('submission_date') and row['submission_date'] < applied_after:
+            if applied_after and row.get('submission_date') and row[
+                    'submission_date'] < applied_after:
                 continue
-            if start_before and row.get('start_date') and row['start_date'] > start_before:
+            if start_before and row.get(
+                    'start_date') and row['start_date'] > start_before:
                 continue
 
             referrals.append(row)
@@ -129,20 +127,16 @@ def dashboard():
     if sort_by and referrals and sort_by in referrals[0]:
         referrals = sorted(referrals, key=lambda x: x[sort_by])
 
-    return render_template(
-        'dashboard.html',
-        referrals=referrals,
-        search=search_query,
-        location=location_filter,
-        role=role_filter,
-        applied_after=applied_after,
-        start_before=start_before,
-        candidate_filter=candidate_filter,
-        referrer_filter=referrer_filter,
-        status_filter=status_filter
-    )
-
-
+    return render_template('dashboard.html',
+                           referrals=referrals,
+                           search=search_query,
+                           location=location_filter,
+                           role=role_filter,
+                           applied_after=applied_after,
+                           start_before=start_before,
+                           candidate_filter=candidate_filter,
+                           referrer_filter=referrer_filter,
+                           status_filter=status_filter)
 
 
 @app.route('/export', methods=['GET'])
@@ -167,21 +161,26 @@ def export():
             row_applied = row.get('date_applied', '')
             row_start = row.get('start_date', '')
 
-            match_search = search_query in row['candidate_name'].lower() or search_query in row['referrer_name'].lower()
+            match_search = search_query in row['candidate_name'].lower(
+            ) or search_query in row['referrer_name'].lower()
             match_location = location_filter in row_location if location_filter else True
             match_role = role_filter in row_role if role_filter else True
 
             match_applied = True
             if applied_after and row_applied:
                 try:
-                    match_applied = datetime.strptime(row_applied, "%Y-%m-%d") >= datetime.strptime(applied_after, "%Y-%m-%d")
+                    match_applied = datetime.strptime(
+                        row_applied, "%Y-%m-%d") >= datetime.strptime(
+                            applied_after, "%Y-%m-%d")
                 except:
                     match_applied = False
 
             match_start = True
             if start_before and row_start:
                 try:
-                    match_start = datetime.strptime(row_start, "%Y-%m-%d") <= datetime.strptime(start_before, "%Y-%m-%d")
+                    match_start = datetime.strptime(
+                        row_start, "%Y-%m-%d") <= datetime.strptime(
+                            start_before, "%Y-%m-%d")
                 except:
                     match_start = False
 
@@ -191,7 +190,8 @@ def export():
     # Create CSV response
     def generate():
         fieldnames = filtered[0].keys() if filtered else []
-        output = csv.DictWriter(open('filtered_output.csv', 'w', newline=''), fieldnames=fieldnames)
+        output = csv.DictWriter(open('filtered_output.csv', 'w', newline=''),
+                                fieldnames=fieldnames)
         output.writeheader()
         output.writerows(filtered)
 
@@ -199,7 +199,12 @@ def export():
             for line in file:
                 yield line
 
-    return app.response_class(generate(), mimetype='text/csv', headers={"Content-Disposition": "attachment; filename=referrals_export.csv"})
+    return Response(generate(),
+                    mimetype='text/csv',
+                    headers={
+                        "Content-Disposition":
+                        "attachment; filename=referrals_export.csv"
+                    })
 
 
 @app.route('/lookup', methods=['GET', 'POST'])
